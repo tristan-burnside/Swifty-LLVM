@@ -9,10 +9,10 @@ public struct FunctionType: IRType, Hashable {
   /// Creates an instance with given `parameters` and `returnType` in `module`.
   ///
   /// The return type is `void` if `returnType` is passed `nil`.
-  public init(from parameters: [IRType], to returnType: IRType? = nil, in module: inout Module) {
+  public init(from parameters: [IRType], to returnType: IRType? = nil, isVarArg: Bool, in module: inout Module) {
     let r = returnType ?? VoidType(in: &module)
     self.llvm = parameters.withHandles { (p) in
-      .init(LLVMFunctionType(r.llvm.raw, p.baseAddress, UInt32(p.count), 0))
+      .init(LLVMFunctionType(r.llvm.raw, p.baseAddress, UInt32(p.count), isVarArg ? 1 : 0))
     }
   }
 

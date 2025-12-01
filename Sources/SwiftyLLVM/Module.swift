@@ -137,6 +137,15 @@ public struct Module: Sendable {
     }
   }
 
+  public func print(to filepath: String) throws {
+    var error: UnsafeMutablePointer<CChar>? = nil
+    LLVMPrintModuleToFile(llvm.raw, filepath, &error)
+    if let e = error {
+      defer { LLVMDisposeMessage(e) }
+      throw LLVMError(.init(cString: e))
+    }
+  }
+
   /// Compiles this module for given `machine` and returns a result of kind `type`.
   public func compile(
     _ type: CodeGenerationResultType,
@@ -613,6 +622,22 @@ public struct Module: Sendable {
     .init(LLVMBuildStructGEP2(p.llvm, baseType.llvm.raw, base.llvm.raw, UInt32(index), ""))
   }
 
+  public mutating func insertGlobalStringPointer(
+    _ str: String, name: String, at p: InsertionPoint
+  ) -> Instruction {
+    .init(LLVMBuildGlobalStringPtr(p.llvm, str, name))
+  }
+  
+  public mutating func insertGetConstantElementPointer(
+    of base: IRValue,
+    typed baseType: IRType,
+    indices: [IRValue]
+  ) -> Instruction {
+    var i = indices.map({ $0.llvm.raw as Optional })
+    let h = LLVMConstGEP2(baseType.llvm.raw, base.llvm.raw, &i, UInt32(i.count))
+    return .init(h!)
+  }
+  
   public mutating func insertLoad(
     _ type: IRType, from source: IRValue, at p: InsertionPoint
   ) -> Instruction {
@@ -625,6 +650,31 @@ public struct Module: Sendable {
   ) -> Instruction {
     let r = LLVMBuildStore(p.llvm, value.llvm.raw, location.llvm.raw)
     LLVMSetAlignment(r, UInt32(layout.preferredAlignment(of: value.type)))
+    return .init(r!)
+  }
+  
+  @discardableResult
+  public mutating func insertMalloc(
+    _ type: IRType,
+    count: IRValue? = nil,
+    name: String = "",
+    at p: InsertionPoint
+  ) -> Instruction {
+    let r: LLVMValueRef
+    if let count = count {
+      r = LLVMBuildArrayMalloc(p.llvm, type.llvm.raw, count.llvm.raw, name)
+    } else {
+      r = LLVMBuildMalloc(p.llvm, type.llvm.raw, name)
+    }
+    return .init(r)
+  }
+  
+  @discardableResult
+  public mutating func insertFree(
+    _ value: IRValue,
+    at p: InsertionPoint
+  ) -> Instruction {
+    let r = LLVMBuildFree(p.llvm, value.llvm.raw)
     return .init(r!)
   }
 
@@ -802,6 +852,20 @@ public struct Module: Sendable {
   ) -> Instruction {
     .init(LLVMBuildFPExt(p.llvm, source.llvm.raw, target.llvm.raw, ""))
   }
+  
+  public mutating func insertFPtoInt(
+    _ source: IRValue, to target: IRType,
+    signed: Bool = true,
+    at p: InsertionPoint
+  ) -> Instruction {
+      let r: LLVMValueRef
+      if signed {
+        r = LLVMBuildFPToSI(p.llvm, source.llvm.raw, target.llvm.raw, "")
+      } else {
+        r = LLVMBuildFPToUI(p.llvm, source.llvm.raw, target.llvm.raw, "")
+      }
+      return .init(r)
+  }
 
   // MARK: Others
 
@@ -855,6 +919,12 @@ public struct Module: Sendable {
     return .init(LLVMBuildFCmp(p.llvm, predicate.llvm, lhs.llvm.raw, rhs.llvm.raw, ""))
   }
 
+  public mutating func insertCast(
+    _ op: CastOperation, _ value: IRValue, to type: IRType,
+    at p: InsertionPoint
+  ) -> Instruction {
+    return .init(LLVMBuildCast(p.llvm, op.llvm, value.llvm.raw, type.llvm.raw, ""))
+  }
 }
 
 extension Module: CustomStringConvertible {

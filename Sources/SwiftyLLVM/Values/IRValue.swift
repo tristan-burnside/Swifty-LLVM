@@ -18,10 +18,36 @@ extension IRValue {
   }
 
   /// The LLVM IR type of this value.
-  public var type: IRType { AnyType(LLVMTypeOf(llvm.raw)) }
+  public var type: IRType {
+    let type = AnyType(LLVMTypeOf(llvm.raw)!)
+    switch LLVMGetTypeKind(type.llvm.raw) {
+    case LLVMHalfTypeKind: return FloatingPointType(type)!
+    case LLVMVoidTypeKind: return VoidType(type)!
+    case LLVMHalfTypeKind: return FloatingPointType(type)!     /**< 16 bit floating point type */
+    case LLVMFloatTypeKind: return FloatingPointType(type)!     /**< 32 bit floating point type */
+    case LLVMDoubleTypeKind: return FloatingPointType(type)!    /**< 64 bit floating point type */
+    case LLVMX86_FP80TypeKind: return FloatingPointType(type)!  /**< 80 bit floating point type (X87) */
+    case LLVMFP128TypeKind: return FloatingPointType(type)!  /**< 128 bit floating point type (112-bit mantissa)*/
+    case LLVMPPC_FP128TypeKind: return FloatingPointType(type)!  /**< 128 bit floating point type (two 64-bits) */
+    case LLVMLabelTypeKind: return type     /**< Labels */
+    case LLVMIntegerTypeKind: return IntegerType(type.llvm.raw)   /**< Arbitrary bit width integers */
+    case LLVMFunctionTypeKind: return FunctionType(type)!  /**< Functions */
+    case LLVMStructTypeKind: return StructType(type)!   /**< Structures */
+    case LLVMArrayTypeKind: return ArrayType(type)!    /**< Arrays */
+    case LLVMPointerTypeKind: return PointerType(type)!  /**< Pointers */
+    default: return type
+    }
+  }
 
   /// The name of this value.
-  public var name: String { String(from: llvm.raw, readingWith: LLVMGetValueName2(_:_:)) ?? "" }
+  public var name: String {
+    get {
+      String(from: llvm.raw, readingWith: LLVMGetValueName2(_:_:)) ?? ""
+    }
+    set {
+      LLVMSetValueName2(llvm.raw, newValue, newValue.count)
+    }
+  }
 
   /// `true` iff this value is the `null` instance of its type.
   public var isNull: Bool { LLVMIsNull(llvm.raw) != 0 }

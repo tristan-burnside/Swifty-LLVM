@@ -18,11 +18,13 @@ public struct StructType: IRType, Hashable {
   /// A unique name is generated if `name` is empty or if `module` already contains a struct with
   /// the same name.
   public init(
-    named name: String, _ fields: [IRType], packed: Bool = false, in module: inout Module
+    named name: String, _ fields: [IRType]?, packed: Bool = false, in module: inout Module
   ) {
     self.llvm = .init(LLVMStructCreateNamed(module.context, name))
-    fields.withHandles { (f) in
-      LLVMStructSetBody(self.llvm.raw, f.baseAddress, UInt32(f.count), packed ? 1 : 0)
+    if let fields {
+      fields.withHandles { (f) in
+        LLVMStructSetBody(self.llvm.raw, f.baseAddress, UInt32(f.count), packed ? 1 : 0)
+      }
     }
   }
 
@@ -52,6 +54,12 @@ public struct StructType: IRType, Hashable {
 
   /// The fields of the struct.
   public var fields: Fields { .init(of: self) }
+   
+  public func setFields(_ fields: [IRType], packed: Bool = false) {
+    fields.withHandles { (f) in
+      LLVMStructSetBody(self.llvm.raw, f.baseAddress, UInt32(f.count), packed ? 1 : 0)
+    }
+  }
 
   /// Returns a constant whose LLVM IR type is `self` and whose value is aggregating `parts`.
   public func constant<S: Sequence>(
